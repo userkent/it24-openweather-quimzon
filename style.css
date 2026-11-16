@@ -1,0 +1,138 @@
+:root {
+    font-family: system-ui, -apple-system, Segoe UI, Arial, sans-serif;
+    color: #19334a;
+    background: #f3f7fb;
+}
+
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+}
+
+header {
+    background: #037938;
+    color: white;
+    padding: 30px max(20px, calc((100vw - 1050px) / 2));
+}
+
+button {
+    color: white;
+    background-color: green;
+    border-radius: 20px;
+    padding: 10px max(20px, calc((50vw - 1000px) / 2));
+}
+
+header h1 {
+    margin: 0 0 5px;
+    font-size: clamp(1.5rem, 4vw, 2.3rem);
+}
+
+header p {
+    margin: 0;
+}
+
+.eyebrow {
+    font-size: 0.78rem;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: #d3d4d4;
+    margin-bottom: 8px;
+}
+
+main {
+    max-width: 1050px;
+    margin: 20px auto;
+    padding: 0 18px;
+}
+
+.controls,
+.weather-panel {
+    outline:auto;
+    outline-color: #037938;
+    background: white;
+    border: 1px solid #dce6ee;
+    border-radius: 14px;
+    padding: 18px;
+    margin-bottom: 16px;
+}
+
+.controls label {
+    display: block;
+    font-weight: 700;
+    margin-bottom: 7px;
+}
+
+input {
+    width: 100%;
+    max-width: 420px;
+    padding: 10px 12px;
+    border: 1px solid #a4bacb;
+    border-radius: 8px;
+    font-size: 1rem;
+}
+
+.hint {
+    font-size: 0.85rem;
+    color: #546579;
+    max-width: 800px;
+}
+
+.controls #status {
+    margin-bottom: 0;
+    font-weight: 600;
+}
+
+#map {
+    height: 490px;
+    border-radius: 14px;
+    border: 1px solid #dce6ee;
+    z-index: 0;
+    margin-bottom: 16px;
+}
+
+.weather-panel h2 {
+    font-size: 1.1rem;
+    margin: 0 0 10px;
+}
+
+.weather-card {
+    display: flex;
+    gap: 15px;
+    align-items: center;
+    flex-wrap: wrap;
+}
+
+.weather-card .temperature {
+    font-size: 2rem;
+    font-weight: 800;
+    color: #0c6480;
+}
+
+.weather-card img {
+    width: 65px;
+    height: 65px;
+}
+
+footer {
+    background-color: green;
+    text-align: center;
+    font-size: 0.78rem;
+    color: #ffffff;
+    padding: 15px max(20px, calc((100vw - 1000px) / 2));
+    
+}
+
+.leaflet-popup-content {
+    min-width: 190px;
+}
+
+.leaflet-popup-content h3 {
+    margin: 3px 0 8px;
+}
+
+.leaflet-popup-content p {
+    margin: 5px 0;
+}
