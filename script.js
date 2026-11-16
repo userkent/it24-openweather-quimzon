@@ -5,12 +5,47 @@ const cities = [
   
 ];
 
-const map = L.map("map").setView([11.2, 123.0], 6);
-L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19,
-  attribution:
-    '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-}).addTo(map);
+// Google Maps Tile Layers (Hybrid Satellite, Pure Satellite, and Street Map)
+const googleHybridLayer = L.tileLayer(
+  "https://{s}.google.com/vt/lyrs=y&x={x}&y={y}&z={z}",
+  {
+    maxZoom: 20,
+    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    attribution: "&copy; Google Maps",
+  }
+);
+
+const googleSatelliteLayer = L.tileLayer(
+  "https://{s}.google.com/vt/lyrs=s&x={x}&y={y}&z={z}",
+  {
+    maxZoom: 20,
+    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    attribution: "&copy; Google Maps",
+  }
+);
+
+const googleStreetLayer = L.tileLayer(
+  "https://{s}.google.com/vt/lyrs=m&x={x}&y={y}&z={z}",
+  {
+    maxZoom: 20,
+    subdomains: ["mt0", "mt1", "mt2", "mt3"],
+    attribution: "&copy; Google Maps",
+  }
+);
+
+const map = L.map("map", {
+  center: [11.2, 123.0],
+  zoom: 6,
+  layers: [googleHybridLayer],
+});
+
+L.control
+  .layers({
+    "Google Hybrid (Satellite + Labels)": googleHybridLayer,
+    "Google Satellite (Pure)": googleSatelliteLayer,
+    "Google Street Map": googleStreetLayer,
+  })
+  .addTo(map);
 
 const apiKeyInput = document.getElementById("apiKey");
 const status = document.getElementById("status");
@@ -29,11 +64,32 @@ function textElement(tag, content) {
   return node;
 }
 
-function weatherView(location, data) {
+// Picks 1 forecast entry per day (preferring 12:00 PM) for the next 5 days
+function extractDailyForecast(forecastList) {
+  const dailyMap = new Map();
+  const todayStr = new Date().toISOString().split("T")[0];
+
+  for (const item of forecastList) {
+    const [datePart, timePart] = item.dt_txt.split(" ");
+    if (datePart === todayStr) continue;
+
+    if (!dailyMap.has(datePart) || timePart === "12:00:00") {
+      dailyMap.set(datePart, item);
+    }
+  }
+
+  return Array.from(dailyMap.values()).slice(0, 5);
+}
+
+// Renders both current weather AND the 5-day forecast cards
+function weatherView(location, currentData, forecastData) {
+  const container = document.createElement("div");
+
+  // 1. Current Weather Card
   const card = document.createElement("div");
   card.className = "weather-card";
-  const description = data.weather?.[0]?.description ?? "Not available";
-  const icon = data.weather?.[0]?.icon ?? "";
+  const description = currentData.weather?.[0]?.description ?? "Not available";
+  const icon = currentData.weather?.[0]?.icon ?? "";
   if (/^\d{2}[dn]$/.test(icon)) {
     const image = document.createElement("img");
     image.src = `https://openweathermap.org/img/wn/${icon}@2x.png`;
@@ -42,7 +98,6 @@ function weatherView(location, data) {
   }
   const info = document.createElement("div");
   info.append(textElement("strong", location.name));
-  // Display Latitude & Longitude
   info.append(
     textElement(
       "div",
@@ -51,93 +106,176 @@ function weatherView(location, data) {
   );
   info.append(textElement("div", description));
   info.append(
-    textElement("div", `Temperature: ${data.main.temp.toFixed(1)} °C`)
+    textElement("div", `Temperature: ${currentData.main.temp.toFixed(1)} °C`)
   );
   info.append(
-    textElement("div", `Feels like: ${data.main.feels_like.toFixed(1)} °C`)
+    textElement(
+      "div",
+      `Feels like: ${currentData.main.feels_like.toFixed(1)} °C`
+    )
   );
-  info.append(textElement("div", `Humidity: ${data.main.humidity}%`));
-  info.append(textElement("div", `Wind: ${data.wind?.speed ?? "N/A"} m/s`));
+  info.append(textElement("div", `Humidity: ${currentData.main.humidity}%`));
+  info.append(
+    textElement("div", `Wind: ${currentData.wind?.speed ?? "N/A"} m/s`)
+  );
   card.append(info);
-  return card;
+  container.append(card);
+
+  // 2. 5-Day Forecast Section
+  const dailyItems = extractDailyForecast(forecastData?.list ?? []);
+  if (dailyItems.length > 0) {
+    const forecastHeading = textElement("h3", "5-Day Forecast");
+    forecastHeading.style.marginTop = "1rem";
+    container.append(forecastHeading);
+
+    const grid = document.createElement("div");
+    grid.className = "forecast-grid";
+    grid.style.display = "grid";
+    grid.style.gridTemplateColumns = "repeat(auto-fit, minmax(120px, 1fr))";
+    grid.style.gap = "0.75rem";
+    grid.style.marginTop = "0.5rem";
+
+    dailyItems.forEach((day) => {
+      const dayCard = document.createElement("div");
+      dayCard.className = "weather-card forecast-item";
+      dayCard.style.padding = "0.6rem";
+      dayCard.style.textAlign = "center";
+      dayCard.style.flexDirection = "column";
+
+      const dateObj = new Date(day.dt * 1000);
+      const dayLabel = dateObj.toLocaleDateString("en-US", {
+        weekday: "short",
+        month: "short",
+        day: "numeric",
+      });
+
+      dayCard.append(textElement("strong", dayLabel));
+
+      const dayIcon = day.weather?.[0]?.icon ?? "";
+      const dayDesc = day.weather?.[0]?.description ?? "";
+      if (/^\d{2}[dn]$/.test(dayIcon)) {
+        const img = document.createElement("img");
+        img.src = `https://openweathermap.org/img/wn/${dayIcon}.png`;
+        img.alt = dayDesc;
+        img.style.margin = "0 auto";
+        dayCard.append(img);
+      }
+
+      dayCard.append(textElement("div", `${day.main.temp.toFixed(1)} °C`));
+      dayCard.append(textElement("small", dayDesc));
+      grid.append(dayCard);
+    });
+
+    container.append(grid);
+  }
+
+  return container;
 }
 
-async function getCurrentWeather(location) {
+// Fetches current weather + 5-day forecast in parallel
+async function getWeatherAndForecast(location) {
   const apiKey = apiKeyInput.value.trim();
   if (!apiKey) throw new Error("Enter your OpenWeather API key first.");
 
-  // Cache results by rounded coordinates and API key for 10 minutes
   const cacheId = `${location.lat.toFixed(4)},${location.lon.toFixed(4)}|${apiKey}`;
   const saved = cache.get(cacheId);
   if (saved && Date.now() - saved.time < CACHE_MS) return saved.data;
 
-  const url = new URL("https://api.openweathermap.org/data/2.5/weather");
-  url.searchParams.set("lat", location.lat);
-  url.searchParams.set("lon", location.lon);
-  url.searchParams.set("units", "metric");
-  url.searchParams.set("appid", apiKey);
+  const currentUrl = new URL("https://api.openweathermap.org/data/2.5/weather");
+  currentUrl.searchParams.set("lat", location.lat);
+  currentUrl.searchParams.set("lon", location.lon);
+  currentUrl.searchParams.set("units", "metric");
+  currentUrl.searchParams.set("appid", apiKey);
 
-  const response = await fetch(url);
-  if (!response.ok) {
-    if (response.status === 401)
+  const forecastUrl = new URL(
+    "https://api.openweathermap.org/data/2.5/forecast"
+  );
+  forecastUrl.searchParams.set("lat", location.lat);
+  forecastUrl.searchParams.set("lon", location.lon);
+  forecastUrl.searchParams.set("units", "metric");
+  forecastUrl.searchParams.set("appid", apiKey);
+
+  const [currentRes, forecastRes] = await Promise.all([
+    fetch(currentUrl),
+    fetch(forecastUrl),
+  ]);
+
+  if (!currentRes.ok) {
+    if (currentRes.status === 401)
       throw new Error(
         "API key rejected (401). Verify your key and product access."
       );
-    if (response.status === 429)
+    if (currentRes.status === 429)
       throw new Error("Request limit exceeded (429). Try again later.");
-    throw new Error(`Weather request failed (HTTP ${response.status}).`);
+    throw new Error(`Weather request failed (HTTP ${currentRes.status}).`);
   }
-  const data = await response.json();
-  if (!data.main || typeof data.main.temp !== "number") {
+
+  const current = await currentRes.json();
+  if (!current.main || typeof current.main.temp !== "number") {
     throw new Error(
       "Unexpected response: temperature information was missing."
     );
   }
-  cache.set(cacheId, { time: Date.now(), data });
-  return data;
+
+  const forecast = forecastRes.ok ? await forecastRes.json() : { list: [] };
+  const combined = { current, forecast };
+
+  cache.set(cacheId, { time: Date.now(), data: combined });
+  return combined;
 }
 
-async function showWeather(location, marker) {
+// [CHANGED]: marker parameter is now optional (defaults to null)
+async function showWeather(location, marker = null) {
   const requestId = ++activeRequest;
   const coordsText = `Lat: ${location.lat.toFixed(4)}, Lon: ${location.lon.toFixed(4)}`;
 
-  setStatus(`Loading weather for ${location.name} (${coordsText})…`);
-  marker
-    .setPopupContent(`${location.name} (${coordsText}): Loading weather…`)
-    .openPopup();
+  setStatus(`Loading weather & forecast for ${location.name} (${coordsText})…`);
+  if (marker) {
+    marker
+      .setPopupContent(`${location.name} (${coordsText}): Loading weather…`)
+      .openPopup();
+  }
 
   try {
-    const data = await getCurrentWeather(location);
+    const { current, forecast } = await getWeatherAndForecast(location);
     if (requestId !== activeRequest) return;
 
-    // Use the API's returned location name if it was an arbitrary map click
     const resolvedLocation = {
       ...location,
-      name: location.isCustom ? data.name || "Selected Location" : location.name,
+      name: location.isCustom
+        ? current.name || "Selected Location"
+        : location.name,
     };
 
-    weatherDetails.replaceChildren(weatherView(resolvedLocation, data));
-
-    const popup = document.createElement("div");
-    popup.append(textElement("h3", resolvedLocation.name));
-    popup.append(textElement("p", coordsText));
-    popup.append(
-      textElement(
-        "p",
-        `${data.main.temp.toFixed(1)} °C — ${
-          data.weather?.[0]?.description ?? "Current weather"
-        }`
-      )
+    weatherDetails.replaceChildren(
+      weatherView(resolvedLocation, current, forecast)
     );
-    popup.append(textElement("p", `Humidity: ${data.main.humidity}%`));
 
-    marker.setPopupContent(popup).openPopup();
-    setStatus(`Showing current weather for ${resolvedLocation.name}.`);
+    if (marker) {
+      const popup = document.createElement("div");
+      popup.append(textElement("h3", resolvedLocation.name));
+      popup.append(textElement("p", coordsText));
+      popup.append(
+        textElement(
+          "p",
+          `${current.main.temp.toFixed(1)} °C — ${
+            current.weather?.[0]?.description ?? "Current weather"
+          }`
+        )
+      );
+      popup.append(textElement("p", `Humidity: ${current.main.humidity}%`));
+
+      marker.setPopupContent(popup).openPopup();
+    }
+
+    setStatus(`Showing weather & 5-day forecast for ${resolvedLocation.name}.`);
   } catch (error) {
     if (requestId !== activeRequest) return;
-    marker
-      .setPopupContent(`${location.name} (${coordsText}): Weather unavailable.`)
-      .openPopup();
+    if (marker) {
+      marker
+        .setPopupContent(`${location.name} (${coordsText}): Weather unavailable.`)
+        .openPopup();
+    }
     weatherDetails.textContent = error.message;
     setStatus(error.message);
   }
@@ -151,8 +289,7 @@ cities.forEach((city) => {
   marker.on("click", () => showWeather(city, marker));
 });
 
-// 2. Click anywhere on the map to add a marker with latitude/longitude & weather
-// [CHANGED]: Creates a new marker per click so previous clicked pins stay on the map
+// 2. Click anywhere on the map: loads weather & forecast without adding any marker
 map.on("click", (e) => {
   const { lat, lng } = e.latlng;
   const clickedLocation = {
@@ -162,15 +299,10 @@ map.on("click", (e) => {
     isCustom: true,
   };
 
-  const marker = L.marker([lat, lng]).addTo(map);
-  marker.bindPopup("Loading...");
-  marker.on("click", () => showWeather(clickedLocation, marker));
-
-  showWeather(clickedLocation, marker);
+  showWeather(clickedLocation);
 });
 
 // 3. Search functionality
-// [ADDED]: Defined form, input, and searchMarkerLayer (these were missing in your last file)
 const form = document.getElementById("searchForm");
 const input = document.getElementById("cityInput");
 const searchMarkerLayer = L.layerGroup().addTo(map);
@@ -180,7 +312,7 @@ form.addEventListener("submit", async (event) => {
   const city = input.value.trim();
   if (city.length < 2) return;
 
-  // [REMOVED]: searchMarkerLayer.clearLayers(); so previous search pins are NOT deleted
+  searchMarkerLayer.clearLayers();
   setStatus(`Searching for "${city}"…`);
 
   try {
@@ -194,7 +326,8 @@ form.addEventListener("submit", async (event) => {
       });
 
     const response = await fetch(url);
-    if (!response.ok) throw new Error(`Geocoding failed (HTTP ${response.status})`);
+    if (!response.ok)
+      throw new Error(`Geocoding failed (HTTP ${response.status})`);
 
     const data = await response.json();
     const locations = data.results ?? [];
@@ -226,28 +359,23 @@ form.addEventListener("submit", async (event) => {
 
       const marker = L.marker(coords).addTo(searchMarkerLayer);
       marker.bindTooltip(displayName);
-
-      // Give every marker immediate location info in its popup
       marker.bindPopup(
         `<strong>${displayName}</strong><br>${coordsText}<br><em>Click pin to load weather</em>`
       );
 
       marker.on("click", () => showWeather(locationObj, marker));
 
-      // Save the #1 best match (Open-Meteo sorts results by population/relevance)
       if (index === 0) {
         primaryResult = { locationObj, marker };
       }
     });
 
-    // Zoom the map first so the popup doesn't get cut off or closed during panning
     if (bounds.length === 1) {
       map.setView(bounds[0], 11);
     } else {
       map.fitBounds(bounds, { padding: [40, 40] });
     }
 
-    // Automatically open the #1 match and load its weather details
     if (primaryResult) {
       await showWeather(primaryResult.locationObj, primaryResult.marker);
     }
